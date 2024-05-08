@@ -1,3 +1,5 @@
+import path from "path";
+
 export const getAllBlog = async ({ set, Blog }: { set: any; Blog: any }) => {
   try {
     const blog = await Blog.find();
@@ -73,17 +75,40 @@ export const createBlog = async ({
   Blog: any;
   body: any;
 }) => {
-  const { title, description }: { title: String; description: String } = body;
-  try {
-    const newblog = await Blog.create({
-      title,
-      description,
-    });
-    set.status = 201;
+  const {
+    title,
+    description,
+    image,
+  }: { title: String; description: String; image: Buffer } = body;
 
-    return {
-      newblog,
-    };
+  try {
+    if (image) {
+      const randomName = Date.now();
+      const extName = path.extname(image.name);
+      const fileName = randomName + extName;
+
+      const img = Bun.file(
+        await Bun.write("./public/uploads/" + fileName, image)
+      );
+      const newblog = await Blog.create({
+        title,
+        description,
+        image: fileName,
+      });
+      set.status = 201;
+      return {
+        newblog,
+      };
+    } else {
+      const newblog = await Blog.create({
+        title,
+        description,
+      });
+      set.status = 201;
+      return {
+        newblog,
+      };
+    }
   } catch (error) {
     set.status = 500;
     return {
@@ -153,4 +178,18 @@ export const deleteBlog = async ({
       error,
     };
   }
+};
+
+export const imageUpload = async ({
+  body: { image },
+}: {
+  body: { image: Buffer };
+}) => {
+  const randomName = Date.now();
+  const extName = path.extname(image.name);
+  const fileName = randomName + extName;
+
+  const img = Bun.file(await Bun.write("./public/uploads/" + fileName, image));
+
+  console.log(fileName);
 };

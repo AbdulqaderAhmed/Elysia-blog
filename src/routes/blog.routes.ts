@@ -4,6 +4,7 @@ import {
   deleteBlog,
   getAllBlog,
   getBlog,
+  imageUpload,
   searchBlog,
   updateBlog,
 } from "../controller/blog.controller";
@@ -14,4 +15,5 @@ export const blogRoute = new Elysia({ prefix: "/blog" })
   .get("/search", searchBlog)
   .get("/id/:id", getBlog)
   .put("/id/:id", updateBlog)
-  .delete("/id/:id", deleteBlog);
+  .delete("/id/:id", deleteBlog)
+  .post("/image", imageUpload);
