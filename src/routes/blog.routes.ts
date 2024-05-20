@@ -16,4 +16,4 @@ export const blogRoute = new Elysia({ prefix: "/blog" })
   .get("/id/:id", getBlog)
   .put("/id/:id", updateBlog)
   .delete("/id/:id", deleteBlog)
-  .post("/image", imageUpload);
+  .get("/image", imageUpload);

@@ -70,10 +70,14 @@ export const createBlog = async ({
   set,
   Blog,
   body,
+  lucia,
+  headers,
 }: {
   set: any;
   Blog: any;
   body: any;
+  lucia: any;
+  headers: any;
 }) => {
   const {
     title,
@@ -82,6 +86,25 @@ export const createBlog = async ({
   }: { title: String; description: String; image: Buffer } = body;
 
   try {
+    const authHeader = headers["authorization"];
+    const sessionID = lucia.readBearerToken(authHeader ?? "");
+
+    if (!sessionID) {
+      set.status = 401;
+      return {
+        error: "You are not logged in",
+      };
+    }
+
+    const { session } = await lucia.validateSession(sessionID);
+
+    if (!session) {
+      set.status = 401;
+      return {
+        error: "You are not logged in",
+      };
+    }
+
     if (image) {
       const randomName = Date.now();
       const extName = path.extname(image.name);
@@ -90,7 +113,9 @@ export const createBlog = async ({
       const img = Bun.file(
         await Bun.write("./public/uploads/" + fileName, image)
       );
+
       const newblog = await Blog.create({
+        author: session.userId,
         title,
         description,
         image: fileName,
@@ -101,6 +126,7 @@ export const createBlog = async ({
       };
     } else {
       const newblog = await Blog.create({
+        author: session.userId,
         title,
         description,
       });
@@ -109,10 +135,10 @@ export const createBlog = async ({
         newblog,
       };
     }
-  } catch (error) {
+  } catch (error: any) {
     set.status = 500;
     return {
-      error,
+      error: error.message,
     };
   }
 };
@@ -147,7 +173,7 @@ export const updateBlog = async ({
   } catch (error) {
     set.status = 500;
     return {
-      error,
+      error: error,
     };
   }
 };
@@ -181,15 +207,24 @@ export const deleteBlog = async ({
 };
 
 export const imageUpload = async ({
-  body: { image },
+  lucia,
+  headers,
 }: {
-  body: { image: Buffer };
+  lucia: any;
+  headers: any;
 }) => {
-  const randomName = Date.now();
-  const extName = path.extname(image.name);
-  const fileName = randomName + extName;
+  try {
+    // VALIDATION USING BEARER TOKEN BY ASSIGNING IN LOCALSTORAGE
 
-  const img = Bun.file(await Bun.write("./public/uploads/" + fileName, image));
+    const authorizationHeader = headers["authorization"];
+    const sessionId = lucia.readBearerToken(authorizationHeader ?? "");
 
-  console.log(fileName);
+    const { session, user } = await lucia.validateSession(sessionId);
+
+    console.log(session, user);
+  } catch (error: any) {
+    return {
+      error: error.message,
+    };
+  }
 };

@@ -4,6 +4,11 @@ export const Blog = mongoose.model(
   "blogs",
   new mongoose.Schema(
     {
+      author: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "users",
+        required: true,
+      },
       title: {
         type: String,
         required: true,
