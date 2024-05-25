@@ -89,13 +89,6 @@ export const createBlog = async ({
     const authHeader = headers["authorization"];
     const sessionID = lucia.readBearerToken(authHeader ?? "");
 
-    if (!sessionID) {
-      set.status = 401;
-      return {
-        error: "You are not logged in",
-      };
-    }
-
     const { session } = await lucia.validateSession(sessionID);
 
     if (!session) {
@@ -106,8 +99,15 @@ export const createBlog = async ({
     }
 
     if (image) {
+      const allowedFileType = ["image/jpeg", "image/jpg", "image/png"];
       const randomName = Date.now();
       const extName = path.extname(image.name);
+      if (!allowedFileType.includes(image.memetype)) {
+        set.status = 400;
+        return {
+          error: "Invalid file type",
+        };
+      }
       const fileName = randomName + extName;
 
       const img = Bun.file(
@@ -148,17 +148,47 @@ export const updateBlog = async ({
   params: { id },
   Blog,
   body,
+  lucia,
+  headers,
 }: {
   set: any;
   params: any;
   body: any;
   Blog: any;
+  lucia: any;
+  headers: any;
 }) => {
   const { title, description }: { title: String; description: String } = body;
-  if (!id) {
-    throw new Error("No such blog found");
-  }
+
   try {
+    const authHeader = headers["authorization"];
+    const sessionID = lucia.readBearerToken(authHeader ?? "");
+
+    const { session, user } = await lucia.validateSession(sessionID);
+
+    if (!session) {
+      set.status = 401;
+      return {
+        error: "You are not logged in",
+      };
+    }
+
+    const blogInfo = await Blog.findById(id);
+
+    if (!blogInfo && id !== blogInfo?._id) {
+      set.status = 404;
+      return {
+        error: "Blog not found!",
+      };
+    }
+
+    if (blogInfo.author.toString() !== user.id.toString()) {
+      set.status = 401;
+      return {
+        error: "You are not allowed to update this blog",
+      };
+    }
+
     const updateBlog = await Blog.findByIdAndUpdate(
       id,
       {
@@ -170,10 +200,10 @@ export const updateBlog = async ({
     return {
       updateBlog,
     };
-  } catch (error) {
+  } catch (error: any) {
     set.status = 500;
     return {
-      error: error,
+      error: error.message,
     };
   }
 };
@@ -182,15 +212,44 @@ export const deleteBlog = async ({
   set,
   params: { id },
   Blog,
+  lucia,
+  headers,
 }: {
   set: any;
   params: any;
   Blog: any;
+  lucia: any;
+  headers: any;
 }) => {
-  if (!id) {
-    throw new Error("No such blog found");
-  }
   try {
+    const authHeader = headers["authorization"];
+    const sessionID = await lucia.readBearerToken(authHeader ?? "");
+
+    const { session, user } = await lucia.validateSession(sessionID);
+
+    if (!session) {
+      set.status = 401;
+      return {
+        error: "You are not logged in",
+      };
+    }
+
+    const blogInfo = await Blog.findById(id);
+
+    if (!blogInfo && id !== blogInfo?._id) {
+      set.status = 404;
+      return {
+        error: "Blog not found!",
+      };
+    }
+
+    if (blogInfo.author.toString() !== user.id.toString()) {
+      set.status = 401;
+      return {
+        error: "You are not allowed to delete this blog",
+      };
+    }
+
     await Blog.findByIdAndDelete(id);
     set.status = 202;
 
@@ -198,10 +257,10 @@ export const deleteBlog = async ({
     return {
       blogs: blog,
     };
-  } catch (error) {
+  } catch (error: any) {
     set.status = 500;
     return {
-      error,
+      error: error.message,
     };
   }
 };
