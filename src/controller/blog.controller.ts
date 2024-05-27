@@ -1,4 +1,5 @@
-import path from "path";
+import { uploadHandler } from "../middleware/imageUploadHandler";
+import { validateToken } from "../middleware/tokenValidation";
 
 export const getAllBlog = async ({ set, Blog }: { set: any; Blog: any }) => {
   try {
@@ -86,55 +87,35 @@ export const createBlog = async ({
   }: { title: String; description: String; image: Buffer } = body;
 
   try {
-    const authHeader = headers["authorization"];
-    const sessionID = lucia.readBearerToken(authHeader ?? "");
-
-    const { session } = await lucia.validateSession(sessionID);
-
-    if (!session) {
-      set.status = 401;
-      return {
-        error: "You are not logged in",
-      };
-    }
+    const userToken = await validateToken(headers, lucia, set);
 
     if (image) {
-      const allowedFileType = ["image/jpeg", "image/jpg", "image/png"];
-      const randomName = Date.now();
-      const extName = path.extname(image.name);
-      if (!allowedFileType.includes(image.memetype)) {
-        set.status = 400;
-        return {
-          error: "Invalid file type",
-        };
-      }
-      const fileName = randomName + extName;
+      const fileName = await uploadHandler(image, set);
 
-      const img = Bun.file(
-        await Bun.write("./public/uploads/" + fileName, image)
-      );
+      Bun.file(await Bun.write("./public/uploads/" + fileName, image));
 
       const newblog = await Blog.create({
-        author: session.userId,
+        author: userToken.session.userId,
         title,
         description,
         image: fileName,
       });
-      set.status = 201;
-      return {
-        newblog,
-      };
-    } else {
-      const newblog = await Blog.create({
-        author: session.userId,
-        title,
-        description,
-      });
+
       set.status = 201;
       return {
         newblog,
       };
     }
+
+    const newblog = await Blog.create({
+      author: userToken.session.userId,
+      title,
+      description,
+    });
+    set.status = 201;
+    return {
+      newblog,
+    };
   } catch (error: any) {
     set.status = 500;
     return {
@@ -161,17 +142,7 @@ export const updateBlog = async ({
   const { title, description }: { title: String; description: String } = body;
 
   try {
-    const authHeader = headers["authorization"];
-    const sessionID = lucia.readBearerToken(authHeader ?? "");
-
-    const { session, user } = await lucia.validateSession(sessionID);
-
-    if (!session) {
-      set.status = 401;
-      return {
-        error: "You are not logged in",
-      };
-    }
+    const userToken = await validateToken(headers, lucia, set);
 
     const blogInfo = await Blog.findById(id);
 
@@ -182,7 +153,7 @@ export const updateBlog = async ({
       };
     }
 
-    if (blogInfo.author.toString() !== user.id.toString()) {
+    if (blogInfo.author.toString() !== userToken.user.id.toString()) {
       set.status = 401;
       return {
         error: "You are not allowed to update this blog",
@@ -222,18 +193,7 @@ export const deleteBlog = async ({
   headers: any;
 }) => {
   try {
-    const authHeader = headers["authorization"];
-    const sessionID = await lucia.readBearerToken(authHeader ?? "");
-
-    const { session, user } = await lucia.validateSession(sessionID);
-
-    if (!session) {
-      set.status = 401;
-      return {
-        error: "You are not logged in",
-      };
-    }
-
+    const userToken = await validateToken(headers, lucia, set);
     const blogInfo = await Blog.findById(id);
 
     if (!blogInfo && id !== blogInfo?._id) {
@@ -243,7 +203,7 @@ export const deleteBlog = async ({
       };
     }
 
-    if (blogInfo.author.toString() !== user.id.toString()) {
+    if (blogInfo.author.toString() !== userToken.user.id.toString()) {
       set.status = 401;
       return {
         error: "You are not allowed to delete this blog",
